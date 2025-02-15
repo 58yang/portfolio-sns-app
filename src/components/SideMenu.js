@@ -1,11 +1,13 @@
-import { useContext, useEffect } from "react";
+import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { SessionContext } from "../SessionProvider";
 import { authRepository } from "../repositories/auth";
+import { supabase } from "../lib/supabase";
 
 export function SideMenu() {
   const { currentUser, setCurrentUser } = useContext(SessionContext);
   const navigate = useNavigate();
+  const [userRole, setUserRole] = useState(null);
 
   // useEffectでcurrentUserの情報をロード
   useEffect(() => {
@@ -22,6 +24,42 @@ export function SideMenu() {
       fetchUser();
     }
   }, [currentUser, setCurrentUser]); // currentUserが変更されたら再取得
+
+  useEffect(() => {
+    const checkUserRole = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        console.log("Current user:", user);
+
+        if (user) {
+          // user_rolesテーブルからroleを取得
+          const { data, error } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", user.id) // user_rolesテーブルではuser_idカラムを使用
+            .single();
+
+          console.log("Role data:", data);
+          console.log("Error if any:", error);
+
+          if (error) {
+            console.error("ロールの取得エラー:", error);
+            return;
+          }
+
+          if (data) {
+            setUserRole(data.role);
+          }
+        }
+      } catch (error) {
+        console.error("ユーザーロールの確認中にエラーが発生:", error);
+      }
+    };
+
+    checkUserRole();
+  }, []);
 
   const handleDeleteAccount = async () => {
     const confirmDelete = window.confirm("本当にアカウントを削除しますか？");
@@ -52,9 +90,10 @@ export function SideMenu() {
       <div className="mt-3">
         <button
           onClick={handleDeleteAccount}
-          className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 w-fit"
+          disabled={userRole === "guest"}
+          className="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
-          アカウント削除
+          アカウントを削除
         </button>
       </div>
     </div>
